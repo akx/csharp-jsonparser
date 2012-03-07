@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -27,8 +28,7 @@ namespace JsonParser
 		Null
 	}
 
-	public class JsonValue
-	{
+	public class JsonValue : IEquatable<JsonValue> {
 		private JsonValueType _type;
 		private Dictionary<JsonValue, JsonValue> _dictValue;
 		private List<JsonValue> _listValue;
@@ -42,6 +42,39 @@ namespace JsonParser
 		}
 
 		#region Value Getters
+
+		public JsonValue Get(string key) {
+			if (_type == JsonValueType.Dict) {
+				var dict = DictValue;
+				if (dict != null) {
+					foreach (var kvp in dict) {
+						if (kvp.Key.StrValue == key) return kvp.Value;
+					}
+				}
+			}
+			if(_type == JsonValueType.List) {
+				return Get(Convert.ToInt32(key));
+			}
+			return JsonValue.Null();
+		}
+
+		public JsonValue Get(int index) {
+			if (_type == JsonValueType.List) {
+				if (index >= 0 && index < _listValue.Count) {
+					return _listValue[index];
+				}
+			}
+			return JsonValue.Null();
+		}
+
+		public JsonValue ResolvePath(params string[] keys) {
+			var curr = this;
+			foreach (var key in keys) {
+				if (!(curr._type == JsonValueType.Dict || curr._type == JsonValueType.List)) return JsonValue.Null();
+				curr = curr.Get(key);
+			}
+			return curr;
+		}
 
 		public Dictionary<JsonValue, JsonValue> DictValue {
 			get { return (_type == JsonValueType.Dict ? _dictValue : null); }
@@ -57,6 +90,8 @@ namespace JsonParser
 				if (_type == JsonValueType.Boolean) return _boolValue.ToString(CultureInfo.InvariantCulture);
 				if (_type == JsonValueType.Integer) return _intValue.ToString(CultureInfo.InvariantCulture);
 				if (_type == JsonValueType.Double) return _doubleValue.ToString(CultureInfo.InvariantCulture);
+				if (_type == JsonValueType.Dict) return string.Format("(dict with {0} entries)", _dictValue.Count);
+				if (_type == JsonValueType.List) return string.Format("(list with {0} entries)", _listValue.Count);
 				return "";
 			}
 		}
@@ -86,7 +121,8 @@ namespace JsonParser
 				}
 			}
 			return outDict;
-		} 
+		}
+
 		
 		public static explicit operator int(JsonValue val) {
 			return val.IntValue; 
@@ -171,13 +207,21 @@ namespace JsonParser
 				case JsonValueType.String:
 					sb.Append('"');
 					foreach (var chr in _strValue) {
-						if(chr == '\\') {
-							sb.Append("\\\\");
-							continue;
+						switch (chr) {
+							case '\\':
+								sb.Append("\\\\");
+								continue;
+							case '\n':
+								sb.Append("\\n");
+								continue;
+							case '\r':
+								sb.Append("\\r");
+								continue;
+
 						}
-						if(Char.IsControl(chr)) { // XXX: Use shorter representations?
+						if(Char.IsControl(chr)) {
 							sb.Append("\\u");
-							sb.AppendFormat("{0:4X}", (int) chr);
+							sb.AppendFormat("{0:X4}", (int) chr);
 							continue;
 						}
 						sb.Append(chr);
@@ -200,6 +244,59 @@ namespace JsonParser
 		}
 
 		#endregion
+
+		#region Equality
+
+		public bool Equals(JsonValue other) {
+			if (ReferenceEquals(other, null)) return false;
+			if (ReferenceEquals(this, other)) return true;
+			if (other._type != _type) return false;
+			if (_type == JsonValueType.List) {
+				if(_listValue.Count != other._listValue.Count) return false;
+				for (int i = 0; i < _listValue.Count; i++) {
+					if (_listValue[i] != other._listValue[i]) return false;
+				}
+				return true;
+			}
+			if (_type == JsonValueType.Dict) {
+				foreach(var key in _dictValue.Keys) {
+					JsonValue myV = _dictValue[key], otherV;
+					if(!other._dictValue.TryGetValue(key, out otherV)) {
+						return false;
+					}
+					if(!myV.Equals(otherV)) return false;
+				}
+				return true;
+			}
+
+			if (StrValue == other.StrValue) return true; // XXX: This may not be appropriate
+			return false;
+		}
+
+		public override bool Equals(object obj) {
+			if (ReferenceEquals(obj, null)) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != typeof (JsonValue)) {
+				return false;
+			}
+			return Equals((JsonValue) obj);
+		}
+
+		public static bool operator ==(JsonValue left, JsonValue right) {
+			return Equals(left, right);
+		}
+
+		public static bool operator !=(JsonValue left, JsonValue right) {
+			return !Equals(left, right);
+		}
+
+		public override int GetHashCode() {
+			unchecked {
+				return Type.GetHashCode() << 24 | StrValue.GetHashCode();
+			}
+		}
+
+		#endregion
 	}
 
 	class JsonParser {
@@ -208,6 +305,10 @@ namespace JsonParser
 		private Stack<JsonValue> stack = new Stack<JsonValue>();
 		private static readonly Regex _numberRe = new Regex("^-?[0-9]*(\\.[0-9]*)?([eE][+-][0-9]*)?$");
 		private JsonValue root;
+
+		public static JsonValue Parse(string JSON) {
+			return new JsonParser(new StringReader(JSON)).Parse();
+		}
 
 		public JsonParser(TextReader reader) {
 			this.reader = reader;

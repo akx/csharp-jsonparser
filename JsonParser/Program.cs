@@ -14,7 +14,7 @@ namespace JsonParser
 		""GlossDiv"": {
 			""awesomeness"": 3.141,
 			""uberawesome"": -1024,
-            ""title"": ""S\u3F3C"",
+            ""title"": ""\\\\S\u3F3C\b\r\n"",
 			""GlossList"": {
                 ""GlossEntry"": {
                     ""ID"": ""SGML"",
@@ -35,11 +35,16 @@ namespace JsonParser
 
 
 		static void Main(string[] args) {
-			StringReader sr = new StringReader(testJSON);
-			JsonParser jp = new JsonParser(sr);
-			var root = jp.Parse();
-			Debug.Print(root.ToJSON());
-
+			var el = JsonParser.Parse(testJSON);
+			var json = el.ToJSON();
+			Debug.Print(el.ToString());
+			Debug.Print(json);
+			var el2 = JsonParser.Parse(json);
+			Debug.Print("eq? {0}", el.Equals(el2));
+			var ent = el.ResolvePath("glossary", "GlossDiv", "GlossList", "GlossEntry");
+			var seeAlso = ent.ResolvePath("GlossDef", "GlossSeeAlso");
+			Debug.Print("SeeAlso first: {0}", seeAlso.Get(0).StrValue);
+			Debug.Print("glossee: {0}", ent.ResolvePath("GlossSee").StrValue);
 		}
 	}
 }
