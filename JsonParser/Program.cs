@@ -14,6 +14,7 @@ namespace JsonParser
 		""GlossDiv"": {
 			""awesomeness"": 3.141,
 			""uberawesome"": -1024,
+			""deleted"": true,
             ""title"": ""\\\\S\u3F3C\b\r\n"",
 			""GlossList"": {
                 ""GlossEntry"": {
@@ -45,6 +46,7 @@ namespace JsonParser
 			Debug.Print("SeeAlso first: {0}", seeAlso.Get(0).StrValue);
 			Debug.Print("SeeAlso2 first: {0}", el.ResolvePath("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.GlossSeeAlso.0").StrValue);
 			Debug.Print("glossee: {0}", ent.ResolvePath("GlossSee").StrValue);
+			Debug.Print("Deleted: {0}", el.ResolvePath("glossary.GlossDiv.deleted").BoolValue);
 		}
 	}
 }
