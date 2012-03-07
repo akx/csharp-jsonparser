@@ -40,10 +40,10 @@ namespace JsonParser
 			Debug.Print(el.ToString());
 			Debug.Print(json);
 			var el2 = JsonParser.Parse(json);
-			Debug.Print("eq? {0}", el.Equals(el2));
 			var ent = el.ResolvePath("glossary", "GlossDiv", "GlossList", "GlossEntry");
 			var seeAlso = ent.ResolvePath("GlossDef", "GlossSeeAlso");
 			Debug.Print("SeeAlso first: {0}", seeAlso.Get(0).StrValue);
+			Debug.Print("SeeAlso2 first: {0}", el.ResolvePath("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.GlossSeeAlso.0").StrValue);
 			Debug.Print("glossee: {0}", ent.ResolvePath("GlossSee").StrValue);
 		}
 	}

@@ -67,6 +67,10 @@ namespace JsonParser
 			return JsonValue.Null();
 		}
 
+		public JsonValue ResolvePath(string path) {
+			return ResolvePath(path.Split('.'));
+		}
+
 		public JsonValue ResolvePath(params string[] keys) {
 			var curr = this;
 			foreach (var key in keys) {
@@ -167,7 +171,7 @@ namespace JsonParser
 		#endregion
 
 		public override string ToString() {
-			var r = string.Format("JsonValue({0}: {1})", _type, StrValue);
+			var r = string.Format("JSON {0} ({1})", _type, StrValue);
 			return r;
 		}
 
