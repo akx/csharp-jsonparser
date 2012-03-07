@@ -101,15 +101,43 @@ namespace JsonParser
 		}
 
 		public bool BoolValue {
-			get { return (_type == JsonValueType.Boolean ? _boolValue : false); }
+			get {
+				if (_type == JsonValueType.String) return !string.IsNullOrWhiteSpace(_strValue);
+				if (_type == JsonValueType.Boolean) return _boolValue;
+				if (_type == JsonValueType.Integer) return (_intValue != 0);
+				if (_type == JsonValueType.Double) return (_doubleValue != 0);
+				if (_type == JsonValueType.List) return (_listValue.Count > 0);
+				return false;
+			}
 		}
 
 		public int IntValue {
-			get { return (_type == JsonValueType.Integer ? _intValue : 0); }
+			get {
+				if (_type == JsonValueType.Boolean) return (_boolValue ? 1 : 0);
+				if (_type == JsonValueType.Integer) return _intValue;
+				if (_type == JsonValueType.Double) return (int)_doubleValue;
+				return 0;
+			}
 		}
 
 		public double DoubleValue {
-			get { return (_type == JsonValueType.Double ? _doubleValue : 0.0); }
+			get {
+				if (_type == JsonValueType.Boolean) return (_boolValue ? 1.0 : 0.0);
+				if (_type == JsonValueType.Integer) return (double)_intValue;
+				if (_type == JsonValueType.Double) return _doubleValue;
+				return 0.0;
+			}
+		}
+
+		public int Count {
+			get {
+				if (_type == JsonValueType.Boolean && _boolValue == false) return 0;
+				if (_type == JsonValueType.Null) return 0;
+				if (_type == JsonValueType.String) return _strValue.Length;
+				if (_type == JsonValueType.List) return _listValue.Count;
+				if (_type == JsonValueType.Dict) return _dictValue.Count;
+				return 1;
+			}
 		}
 
 		#endregion
@@ -128,15 +156,19 @@ namespace JsonParser
 		}
 
 		
-		public static explicit operator int(JsonValue val) {
+		public static implicit operator int(JsonValue val) {
 			return val.IntValue; 
 		}
-		public static explicit operator double(JsonValue val) {
+		public static implicit operator double(JsonValue val) {
 			return val.DoubleValue;
 		}
-		public static explicit operator string(JsonValue val) {
+		public static implicit operator string(JsonValue val) {
 			return val.StrValue;
 		}
+		public static implicit operator bool(JsonValue val) {
+			return val.BoolValue;
+		}
+
 
 		#endregion
 
