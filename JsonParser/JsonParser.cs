@@ -229,7 +229,9 @@ namespace JsonParser {
 
 		// http://stackoverflow.com/a/457708/51685
 		private static bool IsSubclassOfRawGeneric(Type generic, Type toCheck) {
+			
 			while (toCheck != typeof (object)) {
+				if (toCheck == null || generic == null) return false;
 				var cur = toCheck.IsGenericType ? toCheck.GetGenericTypeDefinition() : toCheck;
 				if (generic == cur) {
 					return true;
@@ -240,14 +242,24 @@ namespace JsonParser {
 		}
 
 		public static JsonValue FromObject(object value) {
+			var fromObject = value as JsonValue;
+			if (fromObject != null) {
+				return fromObject;
+			}
 			if (value == null) {
 				return Null();
 			}
 			if (value is double) {
 				return Double((double) value);
 			}
+			if (value is float) {
+				return Double((float) value);
+			}
 			if (value is int) {
 				return Integer((int) value);
+			}
+			if(value is decimal) {
+				return String(((decimal) value).ToString(CultureInfo.InvariantCulture));
 			}
 			if (value is bool) {
 				return Boolean((bool) value);
@@ -264,7 +276,7 @@ namespace JsonParser {
 		private static Dictionary<object, object> UpcastDictionary(object value) {
 			var noArguments = new object[] {};
 			var d2 = new Dictionary<object, object>();
-			foreach (object currentKvp in (value as IEnumerable)) {
+			foreach (object currentKvp in ((IEnumerable) value)) {
 				var kvpType = currentKvp.GetType();
 				object dKey = kvpType.InvokeMember("Key", BindingFlags.GetProperty, null, currentKvp, noArguments);
 				object dValue = kvpType.InvokeMember("Value", BindingFlags.GetProperty, null, currentKvp, noArguments);
@@ -299,6 +311,10 @@ namespace JsonParser {
 
 		public static JsonValue Double(double d) {
 			return new JsonValue {_type = JsonValueType.Double, _doubleValue = d};
+		}
+
+		public static JsonValue Double(float f) {
+			return new JsonValue { _type = JsonValueType.Double, _doubleValue = f };
 		}
 
 		public static JsonValue Integer(int i) {

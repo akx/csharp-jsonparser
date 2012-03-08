@@ -1,12 +1,12 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
 
-namespace JsonParser
-{
-	static class Program {
-		static void Main(string[] args) {
+namespace JsonParser {
+	internal static class Program {
+		private static void Main(string[] args) {
 			FeatureTest();
 			Console.Write("\n\n\n======\n\n\n");
 			FromObjectTest();
@@ -20,12 +20,13 @@ namespace JsonParser
 				Console.Write(fi.Name.PadRight(16) + " ... ");
 				using (var file = new FileStream(fi.FullName, FileMode.Open, FileAccess.Read)) {
 					var tr = new StreamReader(file, Encoding.UTF8);
-					
+
 					JsonValue obj;
 					try {
 						obj = JsonParser.Parse(tr);
-					} catch(Exception exc) {
-						if(!fi.Name.Contains("fail")) {
+					}
+					catch (Exception exc) {
+						if (!fi.Name.Contains("fail")) {
 							Console.WriteLine("Shouldn't have failed at this file.");
 							throw;
 						}
@@ -70,7 +71,7 @@ namespace JsonParser
 			Console.WriteLine("double = {0}", div.Get("double").DoubleValue);
 			Console.WriteLine("count = {0}", div.Count);
 			Console.WriteLine("stringstringdict:");
-			foreach(var kvp in div.GetStringStringDict()) {
+			foreach (var kvp in div.GetStringStringDict()) {
 				Console.WriteLine("  {0} : {1}", kvp.Key.PadRight(30), kvp.Value);
 			}
 			var entry = div.ResolvePath("GlossList", "GlossEntry");
@@ -80,7 +81,7 @@ namespace JsonParser
 			Console.WriteLine("glossee: {0}", entry.ResolvePath("GlossSee").StrValue);
 			Console.WriteLine("Deleted: {0}", root.ResolvePath("glossary.GlossDiv.deleted").BoolValue);
 
-			using(var ms = new MemoryStream()) {
+			using (var ms = new MemoryStream()) {
 				var sw = new StreamWriter(ms, Encoding.UTF32);
 				root.ToJSON(sw);
 				sw.Flush();
@@ -92,10 +93,17 @@ namespace JsonParser
 			var jv = JsonValue.FromObject(new List<object> {
 				"foo",
 				3.141,
+				10.1f,
+				JsonValue.Double(640.33f),
 				-1024,
+				null,
 				new Dictionary<string, bool> {
 					{"hello", true},
 					{"yes", false},
+				},
+				new Dictionary<int, List<object>> {
+					{120, new List<object> {15, 16, 18}},
+					{140, new List<object> {"yes", true, "false", null, 650.50, Decimal.Parse("548120.123106333", NumberStyles.Currency, CultureInfo.InvariantCulture)}},
 				}
 			});
 			Console.Write(jv.ToJSON());
