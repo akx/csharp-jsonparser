@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -108,7 +109,7 @@ namespace JsonParser {
 		public bool BoolValue {
 			get {
 				if (_type == JsonValueType.String) {
-					return !string.IsNullOrWhiteSpace(_strValue);
+					return !string.IsNullOrEmpty(_strValue);
 				}
 				if (_type == JsonValueType.Boolean) {
 					return _boolValue;
@@ -218,7 +219,7 @@ namespace JsonParser {
 
 		public static JsonValue Dictionary(Dictionary<object, object> from = null) {
 			var val = new JsonValue {_type = JsonValueType.Dict, _dictValue = new Dictionary<JsonValue, JsonValue>()};
-			if(from != null) {
+			if (from != null) {
 				foreach (var kvp in from) {
 					val._dictValue.Add(FromObject(kvp.Key), FromObject(kvp.Value));
 				}
@@ -226,19 +227,57 @@ namespace JsonParser {
 			return val;
 		}
 
+		// http://stackoverflow.com/a/457708/51685
+		private static bool IsSubclassOfRawGeneric(Type generic, Type toCheck) {
+			while (toCheck != typeof (object)) {
+				var cur = toCheck.IsGenericType ? toCheck.GetGenericTypeDefinition() : toCheck;
+				if (generic == cur) {
+					return true;
+				}
+				toCheck = toCheck.BaseType;
+			}
+			return false;
+		}
+
 		public static JsonValue FromObject(object value) {
-			if (value == null) return Null();
-			if (value is List<object>) return List((List<object>) value);
-			if (value is Dictionary<object, object>) return Dictionary((Dictionary<object, object>) value);
-			if (value is double) return Double((double) value);
-			if (value is int) return Integer((int) value);
-			if (value is bool) return Boolean((bool) value);
+			if (value == null) {
+				return Null();
+			}
+			if (value is double) {
+				return Double((double) value);
+			}
+			if (value is int) {
+				return Integer((int) value);
+			}
+			if (value is bool) {
+				return Boolean((bool) value);
+			}
+			if (IsSubclassOfRawGeneric(typeof (List<>), value.GetType())) {
+				return List((IEnumerable<object>) value);
+			}
+			if (IsSubclassOfRawGeneric(typeof (Dictionary<,>), value.GetType())) {
+				return Dictionary(UpcastDictionary(value));
+			}
 			return String(value.ToString());
 		}
 
-		public static JsonValue List(List<object> from = null) {
+		private static Dictionary<object, object> UpcastDictionary(object value) {
+			var noArguments = new object[] {};
+			var d2 = new Dictionary<object, object>();
+			foreach (object currentKvp in (value as IEnumerable)) {
+				var kvpType = currentKvp.GetType();
+				object dKey = kvpType.InvokeMember("Key", BindingFlags.GetProperty, null, currentKvp, noArguments);
+				object dValue = kvpType.InvokeMember("Value", BindingFlags.GetProperty, null, currentKvp, noArguments);
+				if (dKey != null) {
+					d2.Add(dKey, dValue);
+				}
+			}
+			return d2;
+		}
+
+		public static JsonValue List(IEnumerable<object> from = null) {
 			var val = new JsonValue {_type = JsonValueType.List, _listValue = new List<JsonValue>()};
-			if(from != null) {
+			if (from != null) {
 				foreach (var o in from) {
 					val._listValue.Add(FromObject(o));
 				}
@@ -275,76 +314,76 @@ namespace JsonParser {
 		#region JSON Serializers
 
 		public string ToJSON() {
-			var sb = new StringBuilder();
-			ToJSON(sb);
-			return sb.ToString();
+			var sw = new StringWriter();
+			ToJSON(sw);
+			return sw.GetStringBuilder().ToString();
 		}
 
-		public void ToJSON(StringBuilder sb) {
+		public void ToJSON(TextWriter writer) {
 			switch (_type) {
 				case JsonValueType.Dict: {
-					sb.Append('{');
+					writer.Write('{');
 					bool first = true;
 					foreach (var kvp in _dictValue) {
 						if (!first) {
-							sb.Append(',');
+							writer.Write(',');
 						}
-						kvp.Key.ToJSON(sb);
-						sb.Append(':');
-						kvp.Value.ToJSON(sb);
+						kvp.Key.ToJSON(writer);
+						writer.Write(':');
+						kvp.Value.ToJSON(writer);
 						first = false;
 					}
-					sb.Append('}');
+					writer.Write('}');
 				}
 					break;
 
 				case JsonValueType.List: {
-					sb.Append('[');
+					writer.Write('[');
 					bool first = true;
 					foreach (var val in _listValue) {
 						if (!first) {
-							sb.Append(',');
+							writer.Write(',');
 						}
-						val.ToJSON(sb);
+						val.ToJSON(writer);
 						first = false;
 					}
-					sb.Append(']');
+					writer.Write(']');
 				}
 					break;
 				case JsonValueType.String:
-					sb.Append('"');
+					writer.Write('"');
 					foreach (var chr in _strValue) {
 						switch (chr) {
 							case '\\':
-								sb.Append("\\\\");
+								writer.Write("\\\\");
 								continue;
 							case '\n':
-								sb.Append("\\n");
+								writer.Write("\\n");
 								continue;
 							case '\r':
-								sb.Append("\\r");
+								writer.Write("\\r");
 								continue;
 						}
 						if (Char.IsControl(chr)) {
-							sb.Append("\\u");
-							sb.AppendFormat("{0:X4}", (int) chr);
+							writer.Write("\\u");
+							writer.Write(string.Format(CultureInfo.InvariantCulture, "{0:X4}", (int) chr));
 							continue;
 						}
-						sb.Append(chr);
+						writer.Write(chr);
 					}
-					sb.Append('"');
+					writer.Write('"');
 					break;
 				case JsonValueType.Integer:
-					sb.Append(_intValue.ToString(CultureInfo.InvariantCulture));
+					writer.Write(_intValue.ToString(CultureInfo.InvariantCulture));
 					break;
 				case JsonValueType.Double:
-					sb.Append(_doubleValue.ToString(CultureInfo.InvariantCulture));
+					writer.Write(_doubleValue.ToString(CultureInfo.InvariantCulture));
 					break;
 				case JsonValueType.Boolean:
-					sb.Append(_boolValue.ToString(CultureInfo.InvariantCulture).ToLowerInvariant());
+					writer.Write(_boolValue.ToString(CultureInfo.InvariantCulture).ToLowerInvariant());
 					break;
 				case JsonValueType.Null:
-					sb.Append("null");
+					writer.Write("null");
 					break;
 			}
 		}
@@ -424,7 +463,7 @@ namespace JsonParser {
 	}
 
 	public class JsonParser {
-		public enum ParseState {
+		private enum ParseState {
 			ListValue,
 			DictKey,
 			DictValue,
@@ -435,7 +474,7 @@ namespace JsonParser {
 		private static readonly Regex NumberRe = new Regex("^-?[0-9]*(\\.[0-9]*)?([eE][+-]?[0-9]*)?$");
 
 		private readonly TextReader reader;
-		private ParseState _state;
+		private ParseState _state = ParseState.Root;
 		private readonly Stack<JsonValue> _stack = new Stack<JsonValue>();
 		private JsonValue _root;
 
@@ -449,7 +488,6 @@ namespace JsonParser {
 
 		private JsonParser(TextReader reader) {
 			this.reader = reader;
-			this._state = ParseState.Root;
 		}
 
 		private JsonValue Parse() {
@@ -619,11 +657,11 @@ namespace JsonParser {
 				reader.Read(); // okay, read the last one then
 			}
 			var numStr = sb.ToString();
-			double d = Double.Parse(numStr, CultureInfo.InvariantCulture);
-			if (d == Math.Floor(d)) {
-				return JsonValue.Integer((int) d);
+			int intValue;
+			if (Int32.TryParse(numStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out intValue)) {
+				return JsonValue.Integer(intValue);
 			}
-			return JsonValue.Double(d);
+			return JsonValue.Double(Double.Parse(numStr, CultureInfo.InvariantCulture));
 		}
 
 		private void EnsureConstantRead(string content) {
@@ -705,10 +743,9 @@ namespace JsonParser {
 							sb.Append(chr);
 							break;
 						default:
-							throw new Exception("Invalid backslash escape (\\" + chr + ")");
+							throw new Exception("Invalid backslash escape (\\ + charcode " + (int) chr + ")");
 					}
 					q = false;
-					continue;
 				}
 			}
 			return JsonValue.String(sb.ToString());
