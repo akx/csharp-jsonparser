@@ -36,17 +36,46 @@ namespace JsonParser
 
 
 		static void Main(string[] args) {
+			FeatureTest();
+			Console.Write("\n\n\n======\n\n\n");
+			TestJSONFiles();
+			Console.ReadKey();
+		}
+
+		private static void TestJSONFiles() {
+			foreach (FileInfo fi in new DirectoryInfo(".").GetFiles("*.json")) {
+				Console.WriteLine(fi.Name + " ...");
+				using (var file = new FileStream(fi.FullName, FileMode.Open, FileAccess.Read)) {
+					var tr = new StreamReader(file, Encoding.UTF8);
+					
+					JsonValue obj = null;
+					try {
+						obj = JsonParser.Parse(tr);
+					} catch(Exception exc) {
+						if(!fi.Name.Contains("fail")) {
+							Console.WriteLine("Shouldn't have failed at this file.");
+							throw;
+						}
+						Console.WriteLine("  OK, failed with " + exc.Message);
+						continue;
+					}
+					Console.WriteLine("  OK, success.");
+				}
+			}
+		}
+
+		private static void FeatureTest() {
 			var el = JsonParser.Parse(testJSON);
 			var json = el.ToJSON();
-			Debug.Print(el.ToString());
-			Debug.Print(json);
+			Console.WriteLine(el.ToString());
+			Console.WriteLine(json);
 			var el2 = JsonParser.Parse(json);
 			var ent = el.ResolvePath("glossary", "GlossDiv", "GlossList", "GlossEntry");
 			var seeAlso = ent.ResolvePath("GlossDef", "GlossSeeAlso");
-			Debug.Print("SeeAlso first: {0}", seeAlso.Get(0).StrValue);
-			Debug.Print("SeeAlso2 first: {0}", el.ResolvePath("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.GlossSeeAlso.0").StrValue);
-			Debug.Print("glossee: {0}", ent.ResolvePath("GlossSee").StrValue);
-			Debug.Print("Deleted: {0}", el.ResolvePath("glossary.GlossDiv.deleted").BoolValue);
+			Console.WriteLine("SeeAlso first: {0}", seeAlso.Get(0).StrValue);
+			Console.WriteLine("SeeAlso2 first: {0}", el.ResolvePath("glossary.GlossDiv.GlossList.GlossEntry.GlossDef.GlossSeeAlso.0").StrValue);
+			Console.WriteLine("glossee: {0}", ent.ResolvePath("GlossSee").StrValue);
+			Console.WriteLine("Deleted: {0}", el.ResolvePath("glossary.GlossDiv.deleted").BoolValue);
 		}
 	}
 }
